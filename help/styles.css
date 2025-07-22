@@ -1,0 +1,219 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: url('./bj.png') no-repeat center center fixed; 
+  background-size: cover;
+  color: white;
+}
+
+/* header 样式 */
+header {
+  text-align: center;
+  padding: 20px 20px 30px;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 18px;
+  margin: 0 auto 15px; /* 添加底部间距 */
+  max-width: 1100px;
+}
+
+header h1 {
+  font-size: 36px;
+  margin-bottom: 15px;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+header img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+header span {
+  font-size: 18px;
+  color: #ddd;
+}
+
+/* section-game 样式 */
+section.section-game {
+  padding: 32px 28px;
+  margin: 15px auto 32px; /* 添加顶部间距 */
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 18px; /* 恢复完整的圆角 */
+  max-width: 1100px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* 其他 section 样式保持不变 */
+section {
+  padding: 32px 28px;
+  margin: 32px auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 18px;
+  max-width: 1100px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+}
+
+section h2 {
+  font-size: 24px;
+  margin-bottom: 18px; /* 增大标题下间距 */
+  text-align: left;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 18px; /* 增大行间距 */
+  gap: 12px 0;         /* 行间距更明显 */
+}
+
+.col {
+  display: flex;
+  align-items: flex-start;
+  padding: 16px 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+  width: 25%; /* 固定宽度为25%，确保四列均匀分布 */
+  min-height: 80px;
+  box-sizing: border-box;
+}
+
+.icon-container {
+  flex-shrink: 0;
+  margin-right: 10px;
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 8px; /* 向下移动一点，使图标位于两行文本中间 */
+}
+
+.command-icon {
+  width: 40px !important;
+  height: 35px !important;
+  object-fit: contain;
+}
+
+.content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.col span {
+  display: block;
+  margin-bottom: 8px;
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 16px;
+  word-wrap: break-word; /* 允许长单词换行 */
+  overflow-wrap: break-word;
+}
+
+.col p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #fff;
+  word-wrap: break-word; /* 允许长单词换行 */
+  overflow-wrap: break-word;
+}
+
+.col:empty {
+  border-right: none; /* 空列不显示右边框 */
+}
+
+.col:last-child {
+  border-right: none;
+}
+
+footer {
+  text-align: center;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 0 0 18px 18px; /* 页脚圆角与卡片呼应 */
+  margin-bottom: 24px;
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 移动设备适配 */
+@media (max-width: 768px) {
+  header {
+    padding: 15px;
+    margin: 10px;
+    border-radius: 12px;
+  }
+  
+  header h1 {
+    font-size: 24px;
+    margin-bottom: 10px;
+  }
+  
+  header img {
+    width: 60px;
+    height: 60px;
+  }
+  
+  header span {
+    font-size: 14px;
+  }
+  
+  section {
+    margin: 15px 10px;
+    padding: 20px 15px;
+    border-radius: 12px;
+  }
+  
+  section h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+  }
+  
+  .col {
+    width: 100%; /* 在手机上一行显示一个项目 */
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 12px 10px;
+  }
+  
+  .col:last-child {
+    border-bottom: none;
+  }
+  
+  .row {
+    margin-bottom: 10px;
+  }
+  
+  footer {
+    margin: 10px;
+    padding: 10px;
+    font-size: 12px;
+  }
+}
+
+/* 平板设备适配 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .col {
+    width: 50%; /* 在平板上一行显示两个项目 */
+  }
+  
+  .col:nth-child(2n) {
+    border-right: none;
+  }
+  
+  .col:nth-child(2n+1):nth-last-child(1) {
+    border-right: none;
+  }
+}
