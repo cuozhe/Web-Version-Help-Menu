@@ -39,4 +39,4 @@ CREATE TABLE IF NOT EXISTS settings (
   background VARCHAR(255),
   card_opacity FLOAT DEFAULT 1
 );
-INSERT INTO settings (site_title, logo, background, card_opacity) VALUES ('蓑衣帮助', '', '', 1); 
+INSERT INTO settings (site_title, logo, background, card_opacity) VALUES ('蓑衣帮助', '', '', 1);
