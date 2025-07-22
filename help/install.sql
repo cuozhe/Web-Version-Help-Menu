@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS admin (
   username VARCHAR(50) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL
 );
-INSERT INTO admin (username, password) VALUES ('suoyi', MD5('cnmb594188'));
+INSERT INTO admin (username, password) VALUES ('admin', MD5('admin123'));
 
 -- 板块表
 CREATE TABLE IF NOT EXISTS sections (
@@ -34,9 +34,9 @@ CREATE TABLE IF NOT EXISTS items (
 -- 站点设置表
 CREATE TABLE IF NOT EXISTS settings (
   id INT PRIMARY KEY AUTO_INCREMENT,
-  site_title VARCHAR(100) DEFAULT '襙衣帮助',
+  site_title VARCHAR(100) DEFAULT '蓑衣帮助',
   logo VARCHAR(255),
   background VARCHAR(255),
   card_opacity FLOAT DEFAULT 1
 );
-INSERT INTO settings (site_title, logo, background, card_opacity) VALUES ('襙衣帮助', '', '', 1); 
+INSERT INTO settings (site_title, logo, background, card_opacity) VALUES ('蓑衣帮助', '', '', 1); 
