@@ -9,31 +9,60 @@ if (!isset($_SESSION['admin'])) {
 try { $pdo->query("SELECT card_opacity FROM settings LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE settings ADD COLUMN card_opacity FLOAT DEFAULT 1"); }
 try { $pdo->query("SELECT hidden FROM sections LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE sections ADD COLUMN hidden TINYINT(1) DEFAULT 0"); }
 try { $pdo->query("SELECT hidden FROM items LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE items ADD COLUMN hidden TINYINT(1) DEFAULT 0"); }
+// 确保 settings 至少有一条记录
+try { $pdo->exec("INSERT INTO settings (id, site_title, logo, background, card_opacity) SELECT 1, '蓑衣帮助', '', '', 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM settings WHERE id=1)"); } catch (Exception $e) {}
+
+// 上传图片处理函数（仅允许常见图片类型）
+function handle_image_upload($field, $prefix, $oldWebPath = '') {
+    if (empty($_FILES[$field]['name'])) {
+        return $oldWebPath;
+    }
+    $uploadsDir = __DIR__ . '/../uploads';
+    if (!is_dir($uploadsDir)) {
+        @mkdir($uploadsDir, 0775, true);
+    }
+    $maxSize = 5 * 1024 * 1024; // 5MB
+    if (!empty($_FILES[$field]['size']) && $_FILES[$field]['size'] > $maxSize) {
+        return $oldWebPath;
+    }
+    $tmp = $_FILES[$field]['tmp_name'];
+    if (!is_uploaded_file($tmp)) {
+        return $oldWebPath;
+    }
+    $finfo = function_exists('finfo_open') ? @finfo_open(FILEINFO_MIME_TYPE) : false;
+    $mime = $finfo ? @finfo_file($finfo, $tmp) : '';
+    if ($finfo) @finfo_close($finfo);
+    $allowed = [
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+        'image/x-icon' => 'ico',
+        'image/vnd.microsoft.icon' => 'ico'
+    ];
+    if (!isset($allowed[$mime])) {
+        return $oldWebPath;
+    }
+    $ext = $allowed[$mime];
+    $name = $prefix . '_' . time() . '_' . mt_rand(1000,9999) . '.' . $ext;
+    $destLocal = $uploadsDir . '/' . $name;
+    if (@move_uploaded_file($tmp, $destLocal)) {
+        return '/help/uploads/' . $name;
+    }
+    return $oldWebPath;
+}
+
 // 处理站点设置保存
 if (isset($_POST['save_settings'])) {
-    $site_title = $_POST['site_title'] ?? '';
-    $logo = $_POST['old_logo'] ?? '';
-    if (!empty($_FILES['logo']['name'])) {
-        $ext = pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION);
-        $logo_name = 'logo_' . time() . '.' . $ext;
-        $logo_path = '../uploads/' . $logo_name;
-        move_uploaded_file($_FILES['logo']['tmp_name'], $logo_path);
-        $logo = '/help/uploads/' . $logo_name;
-    }
-    $background = $_POST['old_background'] ?? '';
-    if (!empty($_FILES['background']['name'])) {
-        $ext = pathinfo($_FILES['background']['name'], PATHINFO_EXTENSION);
-        $bg_name = 'bg_' . time() . '.' . $ext;
-        $bg_path = '../uploads/' . $bg_name;
-        move_uploaded_file($_FILES['background']['tmp_name'], $bg_path);
-        $background = '/help/uploads/' . $bg_name;
-    }
+    $site_title = trim($_POST['site_title'] ?? '');
+    $logo = handle_image_upload('logo', 'logo', $_POST['old_logo'] ?? '');
+    $background = handle_image_upload('background', 'bg', $_POST['old_background'] ?? '');
     $card_opacity = floatval($_POST['card_opacity'] ?? 1);
     if ($card_opacity < 0.1) $card_opacity = 0.1;
     if ($card_opacity > 1) $card_opacity = 1;
     $pdo->prepare('UPDATE settings SET site_title=?, logo=?, background=?, card_opacity=? WHERE id=1')
         ->execute([$site_title, $logo, $background, $card_opacity]);
-    header('Location: index.php?msg=站点设置已保存#top');
+    header('Location: index.php?msg=' . urlencode('站点设置已保存') . '#top');
     exit;
 }
 // 处理板块添加
@@ -43,13 +72,15 @@ if (isset($_POST['add_section'])) {
     $cols = $pdo->query("SHOW COLUMNS FROM sections")->fetchAll();
     $has_section_id = false;
     foreach($cols as $col){ if($col['Field']==='section_id'){$has_section_id=true;break;}}
+    // 计算排序
+    $order = (int)$pdo->query('SELECT COALESCE(MAX(sort_order),0)+1 FROM sections')->fetchColumn();
     if($has_section_id){
-        $pdo->prepare('INSERT INTO sections (section_id, title) VALUES (?, ?)')->execute([null, $title]);
+        $pdo->prepare('INSERT INTO sections (section_id, title, sort_order) VALUES (?, ?, ?)')->execute([null, $title, $order]);
     }else{
-        $pdo->prepare('INSERT INTO sections (title) VALUES (?)')->execute([$title]);
+        $pdo->prepare('INSERT INTO sections (title, sort_order) VALUES (?, ?)')->execute([$title, $order]);
     }
     $new_id = $pdo->lastInsertId();
-    header('Location: index.php?msg=板块已添加#section-' . $new_id);
+    header('Location: index.php?msg=' . urlencode('板块已添加') . '#section-' . $new_id);
     exit;
 }
 // 处理板块修改
@@ -58,7 +89,7 @@ if (isset($_POST['edit_section'])) {
     $title = $_POST['section_title'] ?? '';
     if ($id > 0) {
         $pdo->prepare('UPDATE sections SET title=? WHERE id=?')->execute([$title, $id]);
-        header('Location: index.php?msg=板块已修改#section-' . $id);
+        header('Location: index.php?msg=' . urlencode('板块已修改') . '#section-' . $id);
         exit;
     }
 }
@@ -66,7 +97,7 @@ if (isset($_POST['edit_section'])) {
 if (isset($_GET['del_section'])) {
     $del_id = $_GET['del_section'];
     $pdo->prepare('DELETE FROM sections WHERE id=?')->execute([$del_id]);
-    header('Location: index.php?msg=板块已删除#top');
+    header('Location: index.php?msg=' . urlencode('板块已删除') . '#top');
     exit;
 }
 // 处理板块隐藏/显示
@@ -74,52 +105,85 @@ if (isset($_GET['toggle_section'])) {
     $id = intval($_GET['toggle_section']);
     $hidden = intval($_GET['hidden']);
     $pdo->prepare('UPDATE sections SET hidden=? WHERE id=?')->execute([$hidden, $id]);
-    header('Location: index.php?msg=板块已更新#section-' . $id);
+    header('Location: index.php?msg=' . urlencode('板块已更新') . '#section-' . $id);
+    exit;
+}
+// 处理板块排序 上移/下移
+if (isset($_GET['move_section'])) {
+    $id = intval($_GET['move_section']);
+    $dir = ($_GET['dir'] ?? 'up') === 'down' ? 'down' : 'up';
+    try {
+        $pdo->beginTransaction();
+        $rows = $pdo->query('SELECT id, sort_order FROM sections ORDER BY sort_order, id')->fetchAll();
+        $stmt = $pdo->prepare('UPDATE sections SET sort_order=? WHERE id=?');
+        $i = 1;
+        foreach ($rows as $r) { $stmt->execute([$i++, $r['id']]); }
+        $rows = $pdo->query('SELECT id, sort_order FROM sections ORDER BY sort_order, id')->fetchAll();
+        $index = -1;
+        for ($j=0;$j<count($rows);$j++){ if ((int)$rows[$j]['id'] === $id) { $index = $j; break; } }
+        if ($index !== -1) {
+            if ($dir === 'up' && $index > 0) {
+                $curr = (int)$rows[$index]['sort_order'];
+                $nbrId = (int)$rows[$index-1]['id'];
+                $nbrOrder = (int)$rows[$index-1]['sort_order'];
+                $pdo->prepare('UPDATE sections SET sort_order=? WHERE id=?')->execute([$nbrOrder, $id]);
+                $pdo->prepare('UPDATE sections SET sort_order=? WHERE id=?')->execute([$curr, $nbrId]);
+            } elseif ($dir === 'down' && $index < count($rows) - 1) {
+                $curr = (int)$rows[$index]['sort_order'];
+                $nbrId = (int)$rows[$index+1]['id'];
+                $nbrOrder = (int)$rows[$index+1]['sort_order'];
+                $pdo->prepare('UPDATE sections SET sort_order=? WHERE id=?')->execute([$nbrOrder, $id]);
+                $pdo->prepare('UPDATE sections SET sort_order=? WHERE id=?')->execute([$curr, $nbrId]);
+            }
+        }
+        $pdo->commit();
+    } catch (Exception $e) {
+        @ $pdo->rollBack();
+    }
+    header('Location: index.php?msg=' . urlencode('板块顺序已更新') . '#section-' . $id);
     exit;
 }
 // 处理菜单项添加
 if (isset($_POST['add_item'])) {
-    $section_id = $_POST['item_section_id'];
-    $title = $_POST['item_title'];
-    $desc = $_POST['item_desc'];
-    $icon = '';
-    if (!empty($_FILES['item_icon']['name'])) {
-        $ext = pathinfo($_FILES['item_icon']['name'], PATHINFO_EXTENSION);
-        $icon = '/help/uploads/icon_' . time() . rand(100,999) . '.' . $ext;
-        move_uploaded_file($_FILES['item_icon']['tmp_name'], '../uploads/' . basename($icon));
-    }
-    $url = $_POST['item_url'];
+    $section_id = intval($_POST['item_section_id']);
+    $title = trim($_POST['item_title'] ?? '');
+    $desc = trim($_POST['item_desc'] ?? '');
+    $icon = handle_image_upload('item_icon', 'icon', '');
+    $url = trim($_POST['item_url'] ?? '');
+    if ($url && !preg_match('#^(https?://|/|mailto:|tel:)#i', $url)) { $url = 'http://' . $url; }
     // 检查items表是否有section_id_fk字段
     $has_fk = false;
     $cols = $pdo->query("SHOW COLUMNS FROM items")->fetchAll();
     foreach($cols as $col){ if($col['Field']==='section_id_fk'){$has_fk=true;break;}}
+    // 计算排序
+    $orderStmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0)+1 FROM items WHERE section_id=?');
+    $orderStmt->execute([$section_id]);
+    $order = (int)$orderStmt->fetchColumn();
+
     if($has_fk){
-        $pdo->prepare('INSERT INTO items (section_id, section_id_fk, title, description, icon, url) VALUES (?,?,?,?,?,?)')
-            ->execute([$section_id, $section_id, $title, $desc, $icon, $url]);
+        $pdo->prepare('INSERT INTO items (section_id, section_id_fk, title, description, icon, url, sort_order) VALUES (?,?,?,?,?,?,?)')
+            ->execute([$section_id, $section_id, $title, $desc, $icon, $url, $order]);
     }else{
-        $pdo->prepare('INSERT INTO items (section_id, title, description, icon, url) VALUES (?,?,?,?,?)')
-            ->execute([$section_id, $title, $desc, $icon, $url]);
+        $pdo->prepare('INSERT INTO items (section_id, title, description, icon, url, sort_order) VALUES (?,?,?,?,?,?)')
+            ->execute([$section_id, $title, $desc, $icon, $url, $order]);
     }
     $new_item_id = $pdo->lastInsertId();
-    header('Location: index.php?msg=菜单项已添加#item-' . $new_item_id);
+    header('Location: index.php?msg=' . urlencode('菜单项已添加') . '#item-' . $new_item_id);
     exit;
 }
 // 处理菜单项修改
 if (isset($_POST['edit_item'])) {
     $id = intval($_POST['item_id'] ?? 0);
-    $title = $_POST['item_title'] ?? '';
-    $desc = $_POST['item_desc'] ?? '';
-    $url = $_POST['item_url'] ?? '';
+    $title = trim($_POST['item_title'] ?? '');
+    $desc = trim($_POST['item_desc'] ?? '');
+    $url = trim($_POST['item_url'] ?? '');
+    if ($url && !preg_match('#^(https?://|/|mailto:|tel:)#i', $url)) { $url = 'http://' . $url; }
     $icon = $_POST['old_icon'] ?? '';
-    if (!empty($_FILES['item_icon']['name'])) {
-        $ext = pathinfo($_FILES['item_icon']['name'], PATHINFO_EXTENSION);
-        $icon = '/help/uploads/icon_' . time() . rand(100,999) . '.' . $ext;
-        @move_uploaded_file($_FILES['item_icon']['tmp_name'], '../uploads/' . basename($icon));
-    }
+    $icon = handle_image_upload('item_icon', 'icon', $icon);
     if ($id > 0) {
         $pdo->prepare('UPDATE items SET title=?, description=?, url=?, icon=? WHERE id=?')
             ->execute([$title, $desc, $url, $icon, $id]);
-        header('Location: index.php?msg=菜单项已修改#item-' . $id);
+        header('Location: index.php?msg=' . urlencode('菜单项已修改') . '#item-' . $id);
         exit;
     }
 }
@@ -132,7 +196,7 @@ if (isset($_GET['del_item'])) {
         $section_id = intval($_GET['section']);
     }
     $anchor = $section_id ? ('#section-' . $section_id) : '#top';
-    header('Location: index.php?msg=菜单项已删除' . $anchor);
+    header('Location: index.php?msg=' . urlencode('菜单项已删除') . $anchor);
     exit;
 }
 // 处理菜单项隐藏/显示
@@ -142,7 +206,51 @@ if (isset($_GET['toggle_item'])) {
     $section_id = intval($_GET['section'] ?? 0);
     $pdo->prepare('UPDATE items SET hidden=? WHERE id=?')->execute([$hidden, $id]);
     $anchor = $section_id ? ('#section-' . $section_id) : '#top';
-    header('Location: index.php?msg=菜单项已更新' . $anchor);
+    header('Location: index.php?msg=' . urlencode('菜单项已更新') . $anchor);
+    exit;
+}
+// 处理菜单项排序 上移/下移
+if (isset($_GET['reorder_item'])) {
+    $id = intval($_GET['reorder_item']);
+    $dir = ($_GET['dir'] ?? 'up') === 'down' ? 'down' : 'up';
+    $stmt = $pdo->prepare('SELECT section_id FROM items WHERE id=?');
+    $stmt->execute([$id]);
+    $section_id = (int)($stmt->fetchColumn() ?: 0);
+    if ($section_id) {
+        try {
+            $pdo->beginTransaction();
+            $rowsStmt = $pdo->prepare('SELECT id, sort_order FROM items WHERE section_id=? ORDER BY sort_order, id');
+            $rowsStmt->execute([$section_id]);
+            $list = $rowsStmt->fetchAll();
+            $seq = $pdo->prepare('UPDATE items SET sort_order=? WHERE id=?');
+            $i = 1;
+            foreach ($list as $r) { $seq->execute([$i++, $r['id']]); }
+            $rowsStmt->execute([$section_id]);
+            $list = $rowsStmt->fetchAll();
+            $index = -1;
+            for ($j=0;$j<count($list);$j++){ if ((int)$list[$j]['id'] === $id) { $index = $j; break; } }
+            if ($index !== -1) {
+                if ($dir === 'up' && $index > 0) {
+                    $curr = (int)$list[$index]['sort_order'];
+                    $nbrId = (int)$list[$index-1]['id'];
+                    $nbrOrder = (int)$list[$index-1]['sort_order'];
+                    $pdo->prepare('UPDATE items SET sort_order=? WHERE id=?')->execute([$nbrOrder, $id]);
+                    $pdo->prepare('UPDATE items SET sort_order=? WHERE id=?')->execute([$curr, $nbrId]);
+                } elseif ($dir === 'down' && $index < count($list) - 1) {
+                    $curr = (int)$list[$index]['sort_order'];
+                    $nbrId = (int)$list[$index+1]['id'];
+                    $nbrOrder = (int)$list[$index+1]['sort_order'];
+                    $pdo->prepare('UPDATE items SET sort_order=? WHERE id=?')->execute([$nbrOrder, $id]);
+                    $pdo->prepare('UPDATE items SET sort_order=? WHERE id=?')->execute([$curr, $nbrId]);
+                }
+            }
+            $pdo->commit();
+        } catch (Exception $e) {
+            @ $pdo->rollBack();
+        }
+    }
+    $anchor = $section_id ? ('#section-' . $section_id) : '#top';
+    header('Location: index.php?msg=' . urlencode('菜单项顺序已更新') . $anchor);
     exit;
 }
 // 处理菜单项移动
@@ -150,7 +258,7 @@ if (isset($_POST['move_item'])) {
     $id = $_POST['item_id'];
     $new_section = $_POST['move_to_section'];
     $pdo->prepare('UPDATE items SET section_id=? WHERE id=?')->execute([$new_section, $id]);
-    header('Location: index.php?msg=菜单项已移动#section-' . $new_section);
+    header('Location: index.php?msg=' . urlencode('菜单项已移动') . '#section-' . $new_section);
     exit;
 }
 // 读取所有板块（包括隐藏的）
@@ -224,6 +332,27 @@ if (!$setting) $setting = ['site_title'=>'', 'logo'=>'', 'background'=>'', 'card
         document.getElementById('move-select-' + id).style.display = 'none';
         document.getElementById('move-btn-' + id).style.display = 'inline-block';
     }
+    function filterItems(input) {
+        var q = (input.value || '').trim().toLowerCase();
+        var sections = document.querySelectorAll('.section');
+        sections.forEach(function(sec){
+            var items = sec.querySelectorAll('.item');
+            var any = false;
+            items.forEach(function(it){
+                var t = (it.querySelector('input[name="item_title"]').value || '').toLowerCase();
+                var d = (it.querySelector('input[name="item_desc"]').value || '').toLowerCase();
+                var u = (it.querySelector('input[name="item_url"]').value || '').toLowerCase();
+                var match = !q || t.includes(q) || d.includes(q) || u.includes(q);
+                it.style.display = match ? '' : 'none';
+                if (match) any = true;
+            });
+            if (q) {
+                sec.style.opacity = any ? '1' : '0.4';
+            } else {
+                sec.style.opacity = '';
+            }
+        });
+    }
     </script>
 </head>
 <body>
@@ -232,7 +361,7 @@ if (!$setting) $setting = ['site_title'=>'', 'logo'=>'', 'background'=>'', 'card
         <h1>后台管理</h1>
         <a href="logout.php">退出登录</a>
     </div>
-    <?php if($msg): ?><div class="msg"><?= $msg ?></div><?php endif; ?>
+    <?php if($msg): ?><div class="msg"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
     <h2>站点设置</h2>
     <form method="post" enctype="multipart/form-data" style="margin-bottom:24px;gap:12px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;">
         <input type="hidden" name="save_settings" value="1">
@@ -247,6 +376,9 @@ if (!$setting) $setting = ['site_title'=>'', 'logo'=>'', 'background'=>'', 'card
     </form>
     <hr>
     <h2>板块管理</h2>
+    <div style="margin:10px 0 6px 0; display:flex; justify-content:flex-end;">
+        <input type="text" placeholder="搜索菜单项..." oninput="filterItems(this)" style="padding:6px 10px;border:1px solid #d0d7de;border-radius:6px;">
+    </div>
     <form method="post" style="margin-bottom:18px;gap:8px;display:flex;flex-wrap:wrap;align-items:center;">
         <input type="text" name="section_title" placeholder="新板块标题" required>
         <button type="submit" name="add_section" value="1">添加板块</button>
@@ -258,6 +390,8 @@ if (!$setting) $setting = ['site_title'=>'', 'logo'=>'', 'background'=>'', 'card
                 <input type="text" name="section_title" value="<?= htmlspecialchars($section['title']) ?>" required>
                 <div style="display:inline-flex;gap:8px;vertical-align:middle;">
                     <button type="submit" name="edit_section" value="1">修改</button>
+                    <a href="?move_section=<?= $section['id'] ?>&dir=up#section-<?= $section['id'] ?>" class="btn-op">上移</a>
+                    <a href="?move_section=<?= $section['id'] ?>&dir=down#section-<?= $section['id'] ?>" class="btn-op">下移</a>
                     <a href="?del_section=<?= $section['id'] ?>" onclick="return confirm('确定删除该板块及其所有菜单项？')" class="btn-op btn-del">删除</a>
                     <a href="?toggle_section=<?= $section['id'] ?>&hidden=<?= $section['hidden'] ? 0 : 1 ?>#section-<?= $section['id'] ?>" class="btn-op btn-hide">
                         <?= $section['hidden'] ? '显示' : '隐藏' ?>
@@ -279,6 +413,8 @@ if (!$setting) $setting = ['site_title'=>'', 'logo'=>'', 'background'=>'', 'card
                                 <input type="hidden" name="old_icon" value="<?= htmlspecialchars($item['icon']) ?>">
                                 <div class="op-group">
                                     <button type="submit" name="edit_item" value="1">修改</button>
+                                    <a href="?reorder_item=<?= $item['id'] ?>&dir=up#item-<?= $item['id'] ?>" class="btn-op">上移</a>
+                                    <a href="?reorder_item=<?= $item['id'] ?>&dir=down#item-<?= $item['id'] ?>" class="btn-op">下移</a>
                                     <button type="button" id="move-btn-<?= $item['id'] ?>" onclick="showMoveSelect(<?= $item['id'] ?>)" class="btn-op">移动</button>
                                     <span id="move-select-<?= $item['id'] ?>" style="display:none;align-items:center;gap:4px;">
                                         <select name="move_to_section">
