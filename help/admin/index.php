@@ -52,6 +52,16 @@ if (isset($_POST['add_section'])) {
     header('Location: index.php?msg=板块已添加#section-' . $new_id);
     exit;
 }
+// 处理板块修改
+if (isset($_POST['edit_section'])) {
+    $id = intval($_POST['section_id'] ?? 0);
+    $title = $_POST['section_title'] ?? '';
+    if ($id > 0) {
+        $pdo->prepare('UPDATE sections SET title=? WHERE id=?')->execute([$title, $id]);
+        header('Location: index.php?msg=板块已修改#section-' . $id);
+        exit;
+    }
+}
 // 处理板块删除
 if (isset($_GET['del_section'])) {
     $del_id = $_GET['del_section'];
@@ -93,6 +103,25 @@ if (isset($_POST['add_item'])) {
     $new_item_id = $pdo->lastInsertId();
     header('Location: index.php?msg=菜单项已添加#item-' . $new_item_id);
     exit;
+}
+// 处理菜单项修改
+if (isset($_POST['edit_item'])) {
+    $id = intval($_POST['item_id'] ?? 0);
+    $title = $_POST['item_title'] ?? '';
+    $desc = $_POST['item_desc'] ?? '';
+    $url = $_POST['item_url'] ?? '';
+    $icon = $_POST['old_icon'] ?? '';
+    if (!empty($_FILES['item_icon']['name'])) {
+        $ext = pathinfo($_FILES['item_icon']['name'], PATHINFO_EXTENSION);
+        $icon = '/help/uploads/icon_' . time() . rand(100,999) . '.' . $ext;
+        @move_uploaded_file($_FILES['item_icon']['tmp_name'], '../uploads/' . basename($icon));
+    }
+    if ($id > 0) {
+        $pdo->prepare('UPDATE items SET title=?, description=?, url=?, icon=? WHERE id=?')
+            ->execute([$title, $desc, $url, $icon, $id]);
+        header('Location: index.php?msg=菜单项已修改#item-' . $id);
+        exit;
+    }
 }
 // 处理菜单项删除
 if (isset($_GET['del_item'])) {
