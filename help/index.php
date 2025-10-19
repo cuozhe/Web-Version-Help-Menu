@@ -2,6 +2,7 @@
 require_once 'admin/db.php';
 // 只读取未隐藏的板块和菜单项
 $setting = $pdo->query('SELECT * FROM settings LIMIT 1')->fetch();
+if (!$setting) { $setting = ['site_title'=>'', 'logo'=>'', 'background'=>'', 'card_opacity'=>1]; }
 $sections = $pdo->query('SELECT * FROM sections WHERE hidden=0 ORDER BY sort_order, id')->fetchAll();
 $items = $pdo->query('SELECT * FROM items WHERE hidden=0 ORDER BY section_id, sort_order, id')->fetchAll();
 // 按板块分组菜单项

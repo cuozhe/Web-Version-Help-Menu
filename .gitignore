@@ -1,0 +1,14 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+
+# Uploads
+help/uploads/*
+!help/uploads/.gitkeep
+
+# Environment
+.env
